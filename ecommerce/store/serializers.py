@@ -12,3 +12,20 @@ class CartItem(serializers.ModelSerializer):
         model=CartItem
         fields='__all__'
         
+# serializing the cart model
+class Cart(serializers.ModelSerializer):
+    class Meta:
+        model=Cart
+        fields='__all__'
+
+
+# creating a add to cart serializer 
+class AddtoCartSerializer(serializers.Serializer):
+    
+    product_id=serializers.IntegerField()
+    quantity=serializers.IntegerField()
+    def validate_quantity(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Quantity must be greater than 0")
+        return value
+    

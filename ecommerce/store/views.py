@@ -1,9 +1,11 @@
 from django.shortcuts import render
 from rest_framework.viewsets import ModelViewSet
-from .models import Product,Cart,CartItem
+from .models import Product,Cart,CartItem,Order,OrderItem
 from .serializers import ProductSerializer, AddtoCartSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from .services.order_service import place_order
+
 class ProductViewSet(ModelViewSet):
     queryset=Product.objects.all()
     serializer_class=ProductSerializer
@@ -23,12 +25,11 @@ class AddToCartAPIView(APIView):
             cart=Cart.objects.get(id=cart_id)
         except Cart.DoesNotExist:
             return Response({'error':'Cart not found'},status=404)
-        
-
 
         product_id=serializer.validated_data['product_id']
         quantity=serializer.validated_data['quantity']
-
+        if quantity>=product.stock:
+            return Response({'error':'Insufficient stock'},status=400)
         try:
             product=Product.objects.get(id=product_id)
         except Product.DoesNotExist:
@@ -39,7 +40,6 @@ class AddToCartAPIView(APIView):
             product=product,
             defaults={'quantity': quantity }
         )
-
         if not created:
             cart_item.quantity+=quantity
             cart_item.save()
@@ -62,17 +62,50 @@ class RemoveFromCartAPIView(APIView):
 
 class ViewCartAPIView(APIView):
     def get(self,request,cart_id):
+        if not Cart.objects.filter(id=cart_id).exists():
+            return Response({'error':'Cart not found'},status=404)
         items=CartItem.objects.filter(
             cart_id=cart_id
         ).select_related('product')
-        data=[]
 
+
+        data=[]
+        total=0
         for i in items:
             data.append({
                 'product':i.product.name,
                 'price': i.product.price,
-                'quantity':i.quantity
+                'quantity':i.quantity,
+                'total':i.product.price*i.quantity
             })
-        return Response(data)
+        
+            total+=i.product.price*i.quantity
+        return Response({"items":data,"cart_total":total})
     
+
+class PlaceOrderAPIView(APIView):
+    def post(self,request,cart_id):
+        data,status_code=place_order(cart_id)
+        return Response(data,status=status_code)
+class UpdateProductAPIView(APIView):
+    def put(self,request,product_id):
+        try:
+            product=Product.objects.get(id=product_id)
+        except Product.DoesNotExist:
+            return Response({'error':'Product not found'},status=404)
+
+        serializer=ProductSerializer(product,data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors,status=400)
+                
+
+
+        
+        
+
+
+
+
         

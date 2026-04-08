@@ -102,7 +102,18 @@ class UpdateProductAPIView(APIView):
                 
 
 
+class ProductViewSet(ModelViewSet):
+    queryset=Product.objects.all()
+    serializer_class=ProductSerializer
+
+    def get_queryset(self):
         
+        queryset=super().get_queryset()
+        search=self.request.query_params.get('search')
+
+        if search:
+            queryset=queryset.filter(name__icontains=search)
+            return queryset
         
 
 
